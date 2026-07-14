@@ -1,0 +1,4 @@
+# Large raw inputs and derived/processed files — not committed to git.
+# See docs/11_CODE_STRUCTURE.md (data/raw and data/processed are not committed).
+data/raw/
+data/processed/

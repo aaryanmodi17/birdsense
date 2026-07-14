@@ -1,0 +1,9 @@
+pandas
+numpy
+scipy
+matplotlib
+seaborn
+earthengine-api
+geopandas       # only if Figure 1/8 maps need it; optional otherwise
+folium          # optional, for interactive map export
+jupyter
