@@ -26,6 +26,7 @@ Reproducible: fixed random seed. Re-running reproduces byte-identical files.
 """
 
 import itertools
+import json
 import os
 import random
 from datetime import date, timedelta
@@ -94,6 +95,8 @@ N_INCIDENTAL = 15   # Rule 3: PROTOCOL NAME == "Incidental"
 N_INCIDENTAL_ALL_REPORTED = 9   # ...of those, this many have ALL SPECIES REPORTED == 1
 N_OUT_OF_BBOX = 12  # Rule 8: coordinates outside the Gujarat bounding box
 N_DUPLICATE_OBS = 10  # Rule 7: exact duplicate (SAMPLING EVENT IDENTIFIER + species)
+N_NON_GUJARAT = 9   # Rule 5: STATE != "Gujarat" (coords left INSIDE bbox)
+N_NON_STUDY_SPECIES = 11  # Rule 6: species outside the 12 study species
 
 # Out-of-bbox coordinate points (real cities / just-outside points).
 OUT_OF_BBOX_POINTS = [
@@ -105,6 +108,18 @@ OUT_OF_BBOX_POINTS = [
     (24.5000, 66.9700),  # Arabian Sea  (lon < 68)
     (25.8000, 71.0000),  # N. Rajasthan (lat > 24.7)
     (21.1702, 75.0000),  # (lon > 74.5)
+]
+
+# Rule 5: non-Gujarat states (coords still inside the bbox, so only STATE catches).
+OTHER_STATES = ["Rajasthan", "Maharashtra", "Madhya Pradesh"]
+
+# Rule 6: species outside the 12 study species (valid checklists otherwise).
+NON_STUDY_SPECIES = [
+    ("House Crow", "Corvus splendens"),
+    ("Rock Pigeon", "Columba livia"),
+    ("Common Myna", "Acridotheres tristis"),
+    ("Black Drongo", "Dicrurus macrocercus"),
+    ("Indian Roller", "Coracias benghalensis"),
 ]
 
 SAMPLING_COLS = [
@@ -336,6 +351,32 @@ duplicate_sources = random.sample(range(n_clean_obs), N_DUPLICATE_OBS)
 for idx in duplicate_sources:
     obs_rows.append(dict(obs_rows[idx]))  # byte-exact duplicate (same GUID)
 
+# Rule 5: valid-looking checklists whose STATE is NOT Gujarat, with coordinates
+# left INSIDE the bbox so ONLY the STATE rule (Rule 5) catches them - isolates
+# Rule 5 from Rule 8. In study period, non-Incidental, study species.
+n_non_gujarat_obs = 0
+for i in range(N_NON_GUJARAT):
+    d = random_date_in_year(random.choice(STUDY_YEARS))
+    lat, lon = gj_point()
+    meta = add_checklist(d, lat, lon, "Traveling", 1, "eBird",
+                         OTHER_STATES[i % len(OTHER_STATES)], random.choice(LOCALITIES))
+    for common, sci in random_species(1):
+        add_observation(meta, common, sci, random_count())
+        n_non_gujarat_obs += 1
+
+# Rule 6: valid checklists reporting species OUTSIDE the 12 study species. Valid
+# in every other respect (in-Gujarat, in-range, in-bbox), so ONLY Rule 6
+# (matched on SCIENTIFIC NAME) catches them.
+n_non_study_obs = 0
+for i in range(N_NON_STUDY_SPECIES):
+    d = random_date_in_year(random.choice(STUDY_YEARS))
+    lat, lon = gj_point()
+    meta = add_checklist(d, lat, lon, "Stationary", 1, "eBird",
+                         "Gujarat", random.choice(LOCALITIES))
+    common, sci = NON_STUDY_SPECIES[i % len(NON_STUDY_SPECIES)]
+    add_observation(meta, common, sci, random_count())
+    n_non_study_obs += 1
+
 # --------------------------------------------------------------------------- #
 # 4. Write files (tab-delimited, no index)
 # --------------------------------------------------------------------------- #
@@ -349,6 +390,39 @@ pd.DataFrame(sampling_rows, columns=SAMPLING_COLS).to_csv(
 pd.DataFrame(obs_rows, columns=OBS_COLS).to_csv(
     obs_path, sep="\t", index=False)
 
+# Machine-readable ground truth of exactly what was planted, so the validation
+# tests (tests/test_validation.py) can assert per-rule drop counts without
+# hardcoding fragile numbers. Counts are OBSERVATION rows unless noted.
+manifest_path = os.path.join(RAW_DIR, "synthetic_manifest.json")
+manifest = {
+    "seed": SEED,
+    "note": "SYNTHETIC test data. Planted bad-record counts for validation tests.",
+    "planted_obs": {
+        "rule_1_historical": n_historical_obs,
+        "rule_2_pre2010": n_pre2010_obs,
+        "rule_2_post2025": n_post2025_obs,
+        "rule_2_total": n_pre2010_obs + n_post2025_obs,
+        "rule_5_non_gujarat": n_non_gujarat_obs,
+        "rule_6_non_study_species": n_non_study_obs,
+        "rule_7_duplicate": N_DUPLICATE_OBS,
+        "rule_8_out_of_bbox": n_outbbox_obs,
+    },
+    "planted_checklists": {
+        "rule_1_historical": N_HISTORICAL,
+        "rule_2_pre2010": N_PRE_2010,
+        "rule_2_post2025": N_POST_2025,
+        "rule_3_incidental": N_INCIDENTAL,
+        "rule_3_incidental_all_reported": N_INCIDENTAL_ALL_REPORTED,
+        "rule_5_non_gujarat": N_NON_GUJARAT,
+        "rule_6_non_study_species": N_NON_STUDY_SPECIES,
+        "rule_8_out_of_bbox": N_OUT_OF_BBOX,
+    },
+    "dalmatian_years_present": DALMATIAN_YEARS,
+    "totals": {"sampling_rows": len(sampling_rows), "obs_rows": len(obs_rows)},
+}
+with open(manifest_path, "w") as fh:
+    json.dump(manifest, fh, indent=2)
+
 # --------------------------------------------------------------------------- #
 # 5. Summary - exactly what cleaning should remove
 # --------------------------------------------------------------------------- #
@@ -356,7 +430,8 @@ pd.DataFrame(obs_rows, columns=OBS_COLS).to_csv(
 total_checklists = len(sampling_rows)
 total_obs = len(obs_rows)
 n_planted_bad_checklists = (N_HISTORICAL + N_PRE_2010 + N_POST_2025
-                            + N_INCIDENTAL + N_OUT_OF_BBOX)
+                            + N_INCIDENTAL + N_OUT_OF_BBOX
+                            + N_NON_GUJARAT + N_NON_STUDY_SPECIES)
 
 bar = "=" * 78
 print(bar)
@@ -385,10 +460,14 @@ print(f"   [Rule 2] pre-2010 (2005-2009):")
 print(f"            {N_PRE_2010} checklists, {n_pre2010_obs} observation rows")
 print(f"   [Rule 2] post-2025 (2026-2027):")
 print(f"            {N_POST_2025} checklists, {n_post2025_obs} observation rows")
-print(f"   [Rule 3] Incidental protocol:")
-print(f"            {N_INCIDENTAL} checklists "
+print(f"   [Rule 3] Incidental protocol (NOT dropped in Stage 1; excluded from")
+print(f"            effort denominators): {N_INCIDENTAL} checklists "
       f"({N_INCIDENTAL_ALL_REPORTED} with ALL SPECIES REPORTED==1), "
       f"{n_incidental_obs} observation rows")
+print(f"   [Rule 5] STATE != 'Gujarat' (coords still inside bbox):")
+print(f"            {N_NON_GUJARAT} checklists, {n_non_gujarat_obs} observation rows")
+print(f"   [Rule 6] non-study species (matched on SCIENTIFIC NAME):")
+print(f"            {N_NON_STUDY_SPECIES} checklists, {n_non_study_obs} observation rows")
 print(f"   [Rule 8] coordinates outside Gujarat bbox (STATE mislabeled 'Gujarat'):")
 print(f"            {N_OUT_OF_BBOX} checklists, {n_outbbox_obs} observation rows")
 print(f"   [Rule 7] exact duplicate (SEI + species) observation rows:")
@@ -396,6 +475,7 @@ print(f"            {N_DUPLICATE_OBS} extra copies of clean rows")
 print()
 print(f"   total planted bad checklists : {n_planted_bad_checklists}")
 print(f"   total planted duplicate obs  : {N_DUPLICATE_OBS}")
+print(f"   manifest (ground truth)      : {manifest_path}")
 print()
 print(" SPARSE SPECIES (low_confidence / <8-year exclusion test)")
 print(f"   Dalmatian Pelican (Pelecanus crispus) present in "
