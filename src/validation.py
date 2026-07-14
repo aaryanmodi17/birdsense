@@ -16,22 +16,34 @@ import pandas as pd
 # Gujarat rough bounding box — 05_DATA_VALIDATION_PLAN.md Rule 8.
 GUJARAT_BBOX = {"lat_min": 20.0, "lat_max": 24.7, "lon_min": 68.0, "lon_max": 74.5}
 
-# Canonical scientific names of the 12 study species — 01_RESEARCH_METHODOLOGY.md.
+# Canonical study-species table — 01_RESEARCH_METHODOLOGY.md. Single source of
+# truth for the species identity + H3 habitat grouping (07_DATABASE_SCHEMA.md:
+# species.habitat_category). Habitat values: 'wetland' | 'grassland_dryland'.
 # Rule 6 matches on SCIENTIFIC NAME, never COMMON NAME.
-STUDY_SPECIES_SCIENTIFIC = [
-    "Anas acuta",             # Northern Pintail
-    "Spatula clypeata",       # Northern Shoveler
-    "Spatula querquedula",    # Garganey
-    "Mareca penelope",        # Eurasian Wigeon
-    "Aythya ferina",          # Common Pochard
-    "Anser indicus",          # Bar-headed Goose
-    "Anser anser",            # Greylag Goose
-    "Grus grus",              # Common Crane
-    "Anthropoides virgo",     # Demoiselle Crane
-    "Phoenicopterus roseus",  # Greater Flamingo
-    "Pelecanus onocrotalus",  # Great White Pelican
-    "Pelecanus crispus",      # Dalmatian Pelican (sparse; still kept at this stage)
+HABITAT_WETLAND = "wetland"
+HABITAT_DRYLAND = "grassland_dryland"
+
+STUDY_SPECIES = [
+    {"common": "Northern Pintail",   "scientific": "Anas acuta",            "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Northern Shoveler",  "scientific": "Spatula clypeata",      "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Garganey",           "scientific": "Spatula querquedula",   "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Eurasian Wigeon",    "scientific": "Mareca penelope",       "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Common Pochard",     "scientific": "Aythya ferina",         "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Bar-headed Goose",   "scientific": "Anser indicus",         "habitat": HABITAT_DRYLAND, "analysis": "full"},
+    {"common": "Greylag Goose",      "scientific": "Anser anser",           "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Common Crane",       "scientific": "Grus grus",             "habitat": HABITAT_DRYLAND, "analysis": "full"},
+    # 05 Rule 6 taxonomy reconciliation: the May 2026 eBird release (v1.16) uses
+    # 'Grus virgo' for Demoiselle Crane; doc 01 lists the synonym 'Anthropoides
+    # virgo', which matches 0 records in the real data. Using the eBird name keeps
+    # the ~8k Gujarat records (a core H3 grassland/dryland species).
+    {"common": "Demoiselle Crane",   "scientific": "Grus virgo",            "habitat": HABITAT_DRYLAND, "analysis": "full"},
+    {"common": "Greater Flamingo",   "scientific": "Phoenicopterus roseus", "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Great White Pelican","scientific": "Pelecanus onocrotalus", "habitat": HABITAT_WETLAND, "analysis": "full"},
+    {"common": "Dalmatian Pelican",  "scientific": "Pelecanus crispus",     "habitat": HABITAT_WETLAND, "analysis": "case_study"},
 ]
+
+# Ordered scientific-name list, derived from the table above (single source).
+STUDY_SPECIES_SCIENTIFIC = [s["scientific"] for s in STUDY_SPECIES]
 
 STUDY_PERIOD_START = 2010
 STUDY_PERIOD_END = 2025

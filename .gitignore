@@ -10,3 +10,13 @@ data/processed/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Generated figures/tables — reproducible by running notebook 06, and they
+# currently embed MOCK environmental values (Fig 6 / Table 5). Keep the dirs.
+outputs/figures/*
+outputs/tables/*
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
+
+# Raw source archives (e.g. the eBird EBD zip) — large, not committed.
+*.zip
