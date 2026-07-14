@@ -21,6 +21,15 @@ from . import validation as V
 SEI = "SAMPLING EVENT IDENTIFIER"
 STUDY_YEARS = list(range(V.STUDY_PERIOD_START, V.STUDY_PERIOD_END + 1))
 
+# Migration/season year starts July 1 so the Nov-Feb winter is one contiguous
+# block (late-Dec and early-Jan land adjacent, not ~51 ISO weeks apart). Used
+# ONLY for the detection-rate-weighted peak-week reframe; arrival stays on the
+# calendar frame (confirmed to be a non-issue there). Full winters within the
+# 2010-2025 calendar-filtered data are migration years 2010-2024 (migration year
+# 2025's Jan-Feb 2026 tail is dropped by Rule 2, so it is excluded here).
+MIGRATION_YEAR_START_MONTH = 7
+MIGRATION_YEARS = list(range(V.STUDY_PERIOD_START, V.STUDY_PERIOD_END))  # 2010-2024
+
 # The single, canonical confirmation threshold — 02_METRICS_METHODOLOGY.md sec 1.
 # Defined exactly once; every arrival/departure calculation uses this constant.
 CONFIRMATION_COUNT = 2
@@ -199,6 +208,57 @@ def compute_migration_metrics(observations, checklists,
                 "centroid_latitude": cen_lat,
                 "centroid_longitude": cen_lon,
                 "low_confidence": low_conf,
+            })
+    return pd.DataFrame(rows)
+
+
+def migration_year_week(dates):
+    """Migration/season-year framing (season starts July 1) — 03/researcher
+    decision. Returns (migration_year, migration_week) as Int64 Series with the
+    input index preserved. migration_year = calendar year if month >= July else
+    year - 1; migration_week = 1-based week index since July 1 of that migration
+    year, so the Nov-Feb winter is contiguous and late-Dec/early-Jan land adjacent.
+    Used ONLY for the peak-week reframe; arrival stays on the calendar frame."""
+    s = dates if isinstance(dates, pd.Series) else pd.Series(list(dates))
+    dt = pd.to_datetime(s, errors="coerce")
+    mig_year = dt.dt.year.where(dt.dt.month >= MIGRATION_YEAR_START_MONTH,
+                                dt.dt.year - 1).astype("Int64")
+    anchor = pd.to_datetime(
+        mig_year.astype(str) + f"-{MIGRATION_YEAR_START_MONTH:02d}-01", errors="coerce")
+    mig_week = ((dt - anchor).dt.days // 7 + 1).astype("Int64")
+    return mig_year, mig_week
+
+
+def compute_migration_frame_peak_week(observations, checklists,
+                                      species=V.STUDY_SPECIES_SCIENTIFIC,
+                                      years=MIGRATION_YEARS):
+    """Detection-rate-weighted peak week on the MIGRATION-YEAR frame (02 sec 3),
+    so the winter is contiguous. Reuses the SAME `peak_week()` engine as Stage 3 —
+    only the week column (migration_week) and the year grouping (migration_year)
+    differ, so the metric is not computed a second way. One row per
+    (species, migration_year)."""
+    obs_c = observations[observations["is_complete_for_effort"].eq(True)].copy()
+    chk_c = checklists[checklists["is_complete_for_effort"].eq(True)].copy()
+    obs_c["migration_year"], obs_c["migration_week"] = migration_year_week(obs_c["OBSERVATION DATE"])
+    chk_c["migration_year"], chk_c["migration_week"] = migration_year_week(chk_c["OBSERVATION DATE"])
+    total_year_week = chk_c.groupby(["migration_year", "migration_week"])[SEI].nunique()
+
+    rows = []
+    for sci in species:
+        sci_obs = obs_c[obs_c["SCIENTIFIC NAME"] == sci]
+        for my in years:
+            syo = sci_obs[sci_obs["migration_year"] == my]
+            if my in total_year_week.index.get_level_values(0):
+                weekly_totals = total_year_week.xs(my, level=0)
+            else:
+                weekly_totals = pd.Series(dtype="int64")
+            pk, rate, raw_pk = peak_week(syo, weekly_totals, week_col="migration_week")
+            rows.append({
+                "species": sci,
+                "migration_year": my,
+                "peak_migration_week": pk,
+                "peak_detection_rate": rate,
+                "raw_peak_migration_week": raw_pk,
             })
     return pd.DataFrame(rows)
 

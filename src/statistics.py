@@ -277,6 +277,54 @@ def build_h2_comparison(metrics_df):
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Peak-week frame comparison — calendar ISO week vs migration-year week
+# (the migration frame removes the Dec/Jan wrap; arrival is untouched)
+# --------------------------------------------------------------------------- #
+
+def _mig_frame_as_metrics(mig_frame):
+    """Adapt the migration-frame peak-week table (species, migration_year,
+    peak_migration_week) so the existing stat builders can consume it unchanged."""
+    df = mig_frame.rename(columns={"migration_year": "year",
+                                   "peak_migration_week": "peak_week"}).copy()
+    df["low_confidence"] = False
+    return df
+
+
+def peakweek_frame_h1(metrics_df, mig_frame, annual_env):
+    """H1 (temperature -> peak week) side by side: CALENDAR ISO-week frame vs
+    MIGRATION-year-week frame, per species. Same correlation engine for both."""
+    cal = build_temperature_correlation(metrics_df, annual_env, "peak_week", False)
+    mig = build_temperature_correlation(_mig_frame_as_metrics(mig_frame), annual_env,
+                                        "peak_week", False)
+    out = cal[["common_name", "scientific_name", "n_years", "pearson_r", "p_value"]].rename(
+        columns={"n_years": "cal_n", "pearson_r": "cal_r", "p_value": "cal_p"})
+    return out.merge(
+        mig[["scientific_name", "n_years", "pearson_r", "p_value"]].rename(
+            columns={"n_years": "mig_n", "pearson_r": "mig_r", "p_value": "mig_p"}),
+        on="scientific_name")
+
+
+def peakweek_frame_h2(metrics_df, mig_frame):
+    """H2 (peak-week trend vs year) side by side: CALENDAR ISO-week frame vs
+    MIGRATION-year-week frame, per species. Same linear-trend engine for both."""
+    cal = species_metric_trend(metrics_df, "peak_week", is_date=False)
+    mig = species_metric_trend(_mig_frame_as_metrics(mig_frame), "peak_week", is_date=False)
+    out = cal[["common", "species", "slope", "p_value"]].rename(
+        columns={"common": "common_name", "species": "scientific_name",
+                 "slope": "cal_slope_wk_per_yr", "p_value": "cal_p"})
+    out = out.merge(
+        mig[["species", "slope", "p_value"]].rename(
+            columns={"species": "scientific_name",
+                     "slope": "mig_slope_wk_per_yr", "p_value": "mig_p"}),
+        on="scientific_name")
+    for c in ("cal_slope_wk_per_yr", "mig_slope_wk_per_yr"):
+        out[c] = out[c].apply(lambda v: _round(v, 3))
+    for c in ("cal_p", "mig_p"):
+        out[c] = out[c].apply(lambda v: _round(v, 4))
+    return out
+
+
 def habitat_category_trends(metrics_df):
     """H3 / Figure 7 — annual mean confirmed-arrival day-of-year for each habitat
     category (wetland vs grassland/dryland), plus each category's linear trend.

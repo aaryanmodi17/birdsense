@@ -105,6 +105,19 @@ def test_confirmed_departure_uses_second_from_latest():
 # Sec 4: Wintering Duration = departure - arrival (days)
 # --------------------------------------------------------------------------- #
 
+def test_migration_year_week_makes_dec_jan_adjacent():
+    # Season starts July 1. Dec 28 2015 and Jan 3 2016 are 6 days apart in reality
+    # but ISO weeks 52 vs 1 (a ~51-week jump). On the migration frame they must be
+    # the SAME migration year and ADJACENT weeks.
+    my, mw = M.migration_year_week(["2015-07-01", "2015-12-28", "2016-01-03"])
+    assert list(my) == [2015, 2015, 2015]          # all one migration year
+    assert mw.iloc[0] == 1                          # July 1 = migration week 1
+    assert mw.iloc[2] - mw.iloc[1] == 1             # Dec 28 -> Jan 3 are adjacent
+    # A June date belongs to the PRIOR migration year (season not yet rolled over).
+    my2, _ = M.migration_year_week(["2016-06-15"])
+    assert my2.iloc[0] == 2015
+
+
 def test_wintering_duration_days():
     assert M.wintering_duration("2015-11-10", "2015-12-10") == 30
     assert M.wintering_duration(None, "2015-12-10") is None
