@@ -2,3 +2,10 @@
 # See docs/11_CODE_STRUCTURE.md (data/raw and data/processed are not committed).
 data/raw/
 data/processed/
+
+# Python virtual environment
+.venv/
+
+# Python caches
+__pycache__/
+*.pyc
