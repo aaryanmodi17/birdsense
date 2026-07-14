@@ -17,8 +17,15 @@ NOT REAL and must never appear in the paper; matched output is tagged
 env_source='MOCK-FAKE'. Switch mock off with mock=False (needs authenticated GEE
 -- see scripts/test_gee_5points.py header for the auth steps).
 
+ERA5 COLLECTION: uses `ECMWF/ERA5/HOURLY`, aggregated to daily (daily MEAN 2 m
+temperature, daily SUMMED precipitation) and then to the winter season. The docs'
+original `ECMWF/ERA5/DAILY` is frozen at 2020-07 and cannot cover 2010-2025;
+ERA5-Land was rejected because it masks open water (nulls coastal/marine waterbird
+locations). Resolution is unchanged (~25-30 km ERA5 grid). See
+03_ENVIRONMENTAL_FRAMEWORK.md and 09_ETL_AND_ANALYSIS_ENGINE.md Stage 4.
+
 CRITICAL UNITS (silent-bug guards -- see the pure converters below):
-  - ERA5 `mean_2m_air_temperature` is in KELVIN  -> Celsius  (subtract 273.15).
+  - ERA5 `temperature_2m` is in KELVIN  -> Celsius  (subtract 273.15).
     Skipping this yields temps around 295 instead of ~22 -- the known silent bug.
   - ERA5 `total_precipitation` is in METERS       -> millimetres (x1000).
   - MODIS MOD13Q1 `NDVI` is a scaled integer      -> NDVI (x0.0001).
@@ -30,7 +37,12 @@ import pandas as pd
 
 from . import validation as V
 
-ERA5_COLLECTION = "ECMWF/ERA5/DAILY"          # 09 Stage 4 / 03 Var 1 & 2
+# ERA5 via GEE — 09 Stage 4 / 03 Var 1 & 2. HOURLY (1943->present) aggregated to
+# daily; chosen because ECMWF/ERA5/DAILY is frozen at 2020-07 (can't cover the
+# study period) and ERA5-Land masks open water. Same ~25-30 km ERA5 grid.
+ERA5_COLLECTION = "ECMWF/ERA5/HOURLY"
+ERA5_TEMP_BAND = "temperature_2m"             # KELVIN; daily/seasonal MEAN
+ERA5_PRECIP_BAND = "total_precipitation"      # METERS; daily/seasonal SUM
 MODIS_NDVI_COLLECTION = "MODIS/061/MOD13Q1"   # 09 Stage 4 / 03 Var 3
 
 KELVIN_TO_CELSIUS = 273.15   # ERA5 temperature offset (K -> C)
@@ -103,7 +115,11 @@ def _mock_point_ndvi(lat, lon, date):
 # --------------------------------------------------------------------------- #
 
 def _ensure_ee(project=None):
+    import os
+
     import ee
+    if project is None:
+        project = os.environ.get("EARTHENGINE_PROJECT")  # e.g. birdsense-502407
     try:
         ee.Number(1).getInfo()          # already initialised?
     except Exception:
@@ -133,12 +149,15 @@ def get_winter_temp_rainfall(year, mock=False, project=None):
     start, end = _winter_window(year)
     col = ee.ImageCollection(ERA5_COLLECTION).filterDate(start, end)
     region = _region(ee)
-    temp_k = (col.select("mean_2m_air_temperature").mean()
+    # ERA5/HOURLY -> season: MEAN of every hourly temperature over the winter;
+    # SUM of every hourly precipitation (total winter rainfall). Then the spatial
+    # mean over Gujarat.
+    temp_k = (col.select(ERA5_TEMP_BAND).mean()
               .reduceRegion(ee.Reducer.mean(), region, ERA5_SCALE_M)
-              .get("mean_2m_air_temperature").getInfo())
-    rain_m = (col.select("total_precipitation").sum()
+              .get(ERA5_TEMP_BAND).getInfo())
+    rain_m = (col.select(ERA5_PRECIP_BAND).sum()
               .reduceRegion(ee.Reducer.mean(), region, ERA5_SCALE_M)
-              .get("total_precipitation").getInfo())
+              .get(ERA5_PRECIP_BAND).getInfo())
     return {
         "mean_winter_temperature_c": kelvin_to_celsius(temp_k),  # KELVIN -> C
         "total_winter_rainfall_mm": meters_to_mm(rain_m),        # METERS -> mm
@@ -158,33 +177,48 @@ def get_winter_ndvi(year, mock=False, project=None):
     return scale_ndvi(raw)  # MODIS scale x0.0001
 
 
+def _era5_day(col_day, point, ee):
+    """Aggregate one day's ERA5/HOURLY images at a point: daily MEAN temperature
+    (deg C) and daily SUMMED precipitation (mm). Returns (temp_c, rain_mm) or
+    (None, None) if the day has no image at that cell."""
+    try:
+        tk = (col_day.select(ERA5_TEMP_BAND).mean()
+              .reduceRegion(ee.Reducer.first(), point, ERA5_SCALE_M)
+              .get(ERA5_TEMP_BAND).getInfo())
+        rm = (col_day.select(ERA5_PRECIP_BAND).sum()
+              .reduceRegion(ee.Reducer.first(), point, ERA5_SCALE_M)
+              .get(ERA5_PRECIP_BAND).getInfo())
+    except Exception:
+        return None, None
+    if tk is None:
+        return None, None
+    return kelvin_to_celsius(tk), meters_to_mm(rm)
+
+
 def get_point_temp_rainfall(lat, lon, date, mock=False, project=None):
     """Per-observation ERA5 temperature (deg C) + rainfall (mm) for one location/
-    date, applying the 03 matching rule: (1) exact date + nearest cell, else
-    (2) nearest within +/- ERA5_WINDOW_DAYS, else (3) NULL. Returns a dict with a
+    date, applying the 03 matching rule: (1) exact date, else (2) nearest date
+    within +/- ERA5_WINDOW_DAYS, else (3) NULL. Each candidate DAY is aggregated
+    from ERA5/HOURLY (daily mean temp, daily summed precip). Returns a dict with a
     `status` of 'exact' | 'window' | 'null'."""
     if mock:
         return _mock_point_temp_rainfall(lat, lon, date)
     ee = _ensure_ee(project)
     point = ee.Geometry.Point([lon, lat])
     d = pd.Timestamp(date)
-    # Priority 1 = exact day; Priority 2 = mean over +/-window as the nearest-
-    # available fallback (refine to true nearest-date in the mentor GEE session).
-    attempts = [("exact", 0, 1), ("window", -ERA5_WINDOW_DAYS, ERA5_WINDOW_DAYS + 1)]
-    for status, lo, hi in attempts:
-        start = (d + pd.Timedelta(days=lo)).strftime("%Y-%m-%d")
-        end = (d + pd.Timedelta(days=hi)).strftime("%Y-%m-%d")  # end exclusive
-        col = ee.ImageCollection(ERA5_COLLECTION).filterDate(start, end).filterBounds(point)
-        img = col.first() if status == "exact" else col.mean()
-        try:
-            vals = (img.select(["mean_2m_air_temperature", "total_precipitation"])
-                    .reduceRegion(ee.Reducer.first(), point, ERA5_SCALE_M).getInfo())
-        except Exception:
-            vals = None
-        if vals and vals.get("mean_2m_air_temperature") is not None:
-            return {"temperature_c": kelvin_to_celsius(vals["mean_2m_air_temperature"]),
-                    "rainfall_mm": meters_to_mm(vals.get("total_precipitation")),
-                    "status": status}
+    # exact day first, then true nearest day within the window (+/-1, +/-2, +/-3).
+    offsets = [0]
+    for k in range(1, ERA5_WINDOW_DAYS + 1):
+        offsets += [k, -k]
+    for off in offsets:
+        day = d + pd.Timedelta(days=off)
+        start = day.strftime("%Y-%m-%d")
+        end = (day + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        col_day = ee.ImageCollection(ERA5_COLLECTION).filterDate(start, end).filterBounds(point)
+        temp_c, rain_mm = _era5_day(col_day, point, ee)
+        if temp_c is not None:
+            return {"temperature_c": temp_c, "rainfall_mm": rain_mm,
+                    "status": "exact" if off == 0 else "window"}
     return {"temperature_c": None, "rainfall_mm": None, "status": "null"}  # Priority 3
 
 

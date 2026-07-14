@@ -14,8 +14,13 @@ each is joined to bird observations.
 **Why:** One of the strongest known drivers of migration timing (H1
 directly tests this).
 
-**Dataset:** ERA5 Reanalysis (ECMWF), accessed via Google Earth Engine
-(`ECMWF/ERA5` collection).
+**Dataset:** ERA5 Reanalysis (ECMWF), accessed via Google Earth Engine —
+specifically the **`ECMWF/ERA5/HOURLY`** collection, aggregated hourly → daily
+(daily **mean** 2 m temperature) → winter-season mean. *Why this collection:*
+the aggregated `ECMWF/ERA5/DAILY` is frozen at 2020-07 and cannot cover the
+2010–2025 study period; ERA5-Land was rejected because it masks open water and
+nulls coastal/marine waterbird locations (e.g. Gulf of Kutch). `ECMWF/ERA5/HOURLY`
+covers the full period at the same ERA5 grid and retains over-water cells.
 
 **Variable used:** Mean daily temperature, aggregated to a winter-season
 mean (Nov–Feb) per year for correlation with arrival date.
@@ -23,7 +28,7 @@ mean (Nov–Feb) per year for correlation with arrival date.
 **Spatial resolution:** ~25–30 km grid. Each observation is matched to
 the nearest grid cell by latitude/longitude.
 
-**Temporal resolution:** Daily, aggregated as needed.
+**Temporal resolution:** Hourly, aggregated to daily then to the winter season.
 
 **Limitation to state in the paper:** Regional grid average, not
 microclimate at the exact wetland — real but coarse.
@@ -38,8 +43,8 @@ the rainfall-residence hypothesis itself was cut from the core 3 (see
 `00_PROJECT_CHARTER.md`); rainfall is kept as a variable for exploratory
 correlation and future-work discussion.
 
-**Dataset:** ERA5 daily precipitation, same GEE collection as
-temperature.
+**Dataset:** ERA5 precipitation from the same `ECMWF/ERA5/HOURLY` collection as
+temperature, aggregated hourly → daily (daily **sum**) → winter-season total.
 
 **Variable used:** Total winter-season rainfall (Nov–Feb) per year.
 

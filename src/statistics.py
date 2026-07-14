@@ -178,19 +178,23 @@ def build_migration_summary(metrics_df):
     return pd.DataFrame(rows)
 
 
-def build_correlation_table(metrics_df, annual_env):
-    """Table 5 (H1) — per species Pearson correlation of winter mean temperature
-    vs confirmed arrival (day-of-year), with interpretation band. Spearman shown
-    as the secondary check (04)."""
+def build_temperature_correlation(metrics_df, annual_env, metric_col="first_arrival",
+                                  is_date=True):
+    """H1 (04) — per species Pearson correlation of winter mean temperature vs a
+    timing metric. `metric_col` is 'first_arrival' (date -> day-of-year;
+    effort-sensitive) or 'peak_week' (numeric ISO week, detection-rate-weighted ->
+    effort-robust). Spearman is the secondary check. Excludes low_confidence
+    years. One implementation for both metrics."""
     conf = _confident(metrics_df)
     temp_by_year = annual_env.set_index("year")["mean_winter_temperature"]
     rows = []
     for sci in _species_order(metrics_df):
         g = conf[conf["species"] == sci].copy()
-        g["arrival_doy"] = date_to_day_of_year(g["first_arrival"])
-        g["temp"] = g["year"].map(temp_by_year)
-        pear = correlation(g["temp"], g["arrival_doy"])
-        spear = spearman_correlation(g["temp"], g["arrival_doy"])
+        g["_metric"] = (date_to_day_of_year(g[metric_col]) if is_date
+                        else pd.to_numeric(g[metric_col], errors="coerce"))
+        g["_temp"] = g["year"].map(temp_by_year)
+        pear = correlation(g["_temp"], g["_metric"])
+        spear = spearman_correlation(g["_temp"], g["_metric"])
         rows.append({
             "common_name": _SCI_TO_COMMON.get(sci, sci),
             "scientific_name": sci,
@@ -201,6 +205,76 @@ def build_correlation_table(metrics_df, annual_env):
             "interpretation": interpret_correlation(pear["r"], pear["p_value"]),
         })
     return pd.DataFrame(rows)
+
+
+def build_correlation_table(metrics_df, annual_env):
+    """Table 5 (H1) — temperature vs confirmed arrival (day-of-year). Delegates to
+    build_temperature_correlation so the correlation is defined exactly once."""
+    return build_temperature_correlation(metrics_df, annual_env, "first_arrival", True)
+
+
+# --------------------------------------------------------------------------- #
+# Effort-robustness comparison — quantify how much of H1/H2 is observer artifact
+# (04: correlation + linear trend only; no multiple regression)
+# --------------------------------------------------------------------------- #
+
+def effort_vs_arrival_correlation(metrics_df, effort_df):
+    """Effort-confound DIAGNOSTIC (04 correlation, not a hypothesis test): per
+    species, Pearson r between annual observer effort (total complete checklists)
+    and confirmed first-arrival day-of-year. A strong correlation means the
+    arrival metric tracks effort, not phenology."""
+    conf = _confident(metrics_df)
+    eff = effort_df[["species", "year", "total_complete_checklists"]]
+    rows = []
+    for sci in _species_order(metrics_df):
+        g = conf[conf["species"] == sci].merge(eff, on=["species", "year"], how="left")
+        arrival = date_to_day_of_year(g["first_arrival"])
+        c = correlation(g["total_complete_checklists"], arrival)
+        rows.append({
+            "common_name": _SCI_TO_COMMON.get(sci, sci),
+            "scientific_name": sci,
+            "n_years": c["n"],
+            "effort_vs_arrival_r": _round(c["r"], 3),
+            "p_value": _round(c["p_value"], 4),
+            "interpretation": interpret_correlation(c["r"], c["p_value"]),
+        })
+    return pd.DataFrame(rows)
+
+
+def build_h1_comparison(metrics_df, annual_env):
+    """H1 side by side: temperature-vs-arrival (effort-sensitive) next to
+    temperature-vs-peak-week (detection-rate-weighted, effort-robust), per species."""
+    arr = build_temperature_correlation(metrics_df, annual_env, "first_arrival", True)
+    pk = build_temperature_correlation(metrics_df, annual_env, "peak_week", False)
+    out = arr[["common_name", "scientific_name", "pearson_r", "p_value", "interpretation"]].rename(
+        columns={"pearson_r": "temp_vs_arrival_r", "p_value": "arrival_p",
+                 "interpretation": "arrival_evidence"})
+    out = out.merge(
+        pk[["scientific_name", "pearson_r", "p_value", "interpretation"]].rename(
+            columns={"pearson_r": "temp_vs_peakweek_r", "p_value": "peakweek_p",
+                     "interpretation": "peakweek_evidence"}),
+        on="scientific_name")
+    return out
+
+
+def build_h2_comparison(metrics_df):
+    """H2 side by side: confirmed-arrival trend (effort-sensitive) next to
+    detection-rate-weighted peak-week trend (effort-robust), per species."""
+    arr = species_metric_trend(metrics_df, "first_arrival", is_date=True)
+    pk = species_metric_trend(metrics_df, "peak_week", is_date=False)
+    out = arr[["common", "species", "slope", "p_value"]].rename(
+        columns={"common": "common_name", "species": "scientific_name",
+                 "slope": "arrival_slope_days_per_yr", "p_value": "arrival_p"})
+    out = out.merge(
+        pk[["species", "slope", "p_value"]].rename(
+            columns={"species": "scientific_name",
+                     "slope": "peakweek_slope_weeks_per_yr", "p_value": "peakweek_p"}),
+        on="scientific_name")
+    for c in ("arrival_slope_days_per_yr", "peakweek_slope_weeks_per_yr"):
+        out[c] = out[c].apply(lambda v: _round(v, 3))
+    for c in ("arrival_p", "peakweek_p"):
+        out[c] = out[c].apply(lambda v: _round(v, 4))
+    return out
 
 
 def habitat_category_trends(metrics_df):

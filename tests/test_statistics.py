@@ -56,6 +56,44 @@ def test_interpret_correlation_bands():
     assert S.interpret_correlation(0.9, 0.20) == "none"     # not significant
 
 
+def _tiny_metrics():
+    return pd.DataFrame({
+        "species": ["Anas acuta"] * 4,
+        "year": [2010, 2011, 2012, 2013],
+        "first_arrival": ["2010-01-05", "2011-01-06", "2012-01-07", "2013-01-08"],
+        "peak_week": [2, 3, 4, 5],
+        "low_confidence": [False] * 4,
+        "n_obs": [10] * 4,
+    })
+
+
+def test_temperature_correlation_peak_week_numeric_path():
+    # peak_week 2..5 rises with temp 20..23 -> Pearson r = +1 (numeric metric).
+    annual = pd.DataFrame({"year": [2010, 2011, 2012, 2013],
+                           "mean_winter_temperature": [20.0, 21.0, 22.0, 23.0]})
+    out = S.build_temperature_correlation(_tiny_metrics(), annual, "peak_week", is_date=False)
+    row = out.iloc[0]
+    assert abs(row["pearson_r"] - 1.0) < 1e-9
+    assert row["n_years"] == 4
+
+
+def test_h2_comparison_has_arrival_and_peakweek_columns():
+    out = S.build_h2_comparison(_tiny_metrics())
+    assert {"arrival_slope_days_per_yr", "peakweek_slope_weeks_per_yr",
+            "arrival_p", "peakweek_p"} <= set(out.columns)
+    # peak_week increases by 1/year -> slope 1.0 week/year.
+    assert abs(out.iloc[0]["peakweek_slope_weeks_per_yr"] - 1.0) < 1e-9
+
+
+def test_effort_vs_arrival_correlation_detects_confound():
+    # Arrival day-of-year rises lockstep with effort -> r = +1 (perfect confound).
+    metrics = _tiny_metrics()
+    effort = pd.DataFrame({"species": ["Anas acuta"] * 4, "year": [2010, 2011, 2012, 2013],
+                           "total_complete_checklists": [100, 200, 300, 400]})
+    out = S.effort_vs_arrival_correlation(metrics, effort)
+    assert abs(out.iloc[0]["effort_vs_arrival_r"] - 1.0) < 1e-9
+
+
 def test_date_to_day_of_year_preserves_index():
     # Regression guard: must preserve the input index so column assignment aligns.
     s = pd.Series(["2015-01-01", "2015-12-31"], index=[7, 42])

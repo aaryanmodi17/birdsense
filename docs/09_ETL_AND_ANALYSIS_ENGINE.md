@@ -140,17 +140,22 @@ def centroid(species_year_obs):
 
 ## Stage 4: Environmental Data (via Google Earth Engine)
 
-For temperature and rainfall (ERA5):
+For temperature and rainfall (ERA5): use the **`ECMWF/ERA5/HOURLY`** collection,
+aggregated hourly → daily (daily **mean** `temperature_2m`, daily **sum**
+`total_precipitation`) → winter season. *Why not `ECMWF/ERA5/DAILY`:* it is frozen
+at 2020-07 and cannot cover 2010–2025; ERA5-Land was rejected because it masks
+open water (nulls coastal/marine waterbird locations). Same ~25–30 km ERA5 grid.
 
 ```python
 import ee
 ee.Initialize()
 
-era5 = ee.ImageCollection("ECMWF/ERA5/DAILY")
+era5 = ee.ImageCollection("ECMWF/ERA5/HOURLY")
 
 def get_winter_temp_rainfall(year):
-    winter = era5.filterDate(f"{year}-11-01", f"{year+1}-02-28")
-    # reduce over Gujarat region, extract mean_2m_air_temperature and total_precipitation
+    winter = era5.filterDate(f"{year}-11-01", f"{year+1}-03-01")  # Nov-Feb
+    # temperature_2m (KELVIN) -> season MEAN; total_precipitation (METERS) -> season SUM;
+    # then reduce over the Gujarat region. Convert K->C and m->mm.
     ...
 ```
 

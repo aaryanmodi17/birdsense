@@ -42,7 +42,7 @@ import ee
 # Set your Google Cloud project id here or via the EARTHENGINE_PROJECT env var.
 EE_PROJECT = os.environ.get("EARTHENGINE_PROJECT", "your-gcp-project-id")
 
-ERA5_COLLECTION = "ECMWF/ERA5/DAILY"
+ERA5_COLLECTION = "ECMWF/ERA5/HOURLY"   # aggregated to daily (mean temp, sum precip)
 MODIS_NDVI_COLLECTION = "MODIS/061/MOD13Q1"
 
 # (name, latitude, longitude, winter date) — 5 known Gujarat wetlands.
@@ -56,14 +56,16 @@ POINTS = [
 
 
 def _era5_point(point, date):
-    """ERA5 for the exact day at the point: returns (raw_kelvin, raw_meters)."""
+    """ERA5/HOURLY aggregated over the day at the point: returns
+    (daily_mean_kelvin, daily_summed_meters)."""
     d = datetime.fromisoformat(date)
     nxt = (d + timedelta(days=1)).strftime("%Y-%m-%d")
-    img = (ee.ImageCollection(ERA5_COLLECTION)
-           .filterDate(date, nxt).filterBounds(point).first())
-    vals = (img.select(["mean_2m_air_temperature", "total_precipitation"])
-            .reduceRegion(ee.Reducer.first(), point, 27830).getInfo())
-    return vals.get("mean_2m_air_temperature"), vals.get("total_precipitation")
+    day = ee.ImageCollection(ERA5_COLLECTION).filterDate(date, nxt).filterBounds(point)
+    temp_k = (day.select("temperature_2m").mean()
+              .reduceRegion(ee.Reducer.first(), point, 27830).get("temperature_2m").getInfo())
+    rain_m = (day.select("total_precipitation").sum()
+              .reduceRegion(ee.Reducer.first(), point, 27830).get("total_precipitation").getInfo())
+    return temp_k, rain_m
 
 
 def _modis_ndvi_point(point, date):
