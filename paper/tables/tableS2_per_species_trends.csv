@@ -1,0 +1,13 @@
+species,scientific,naive_arrival_slope_days_per_yr,naive_arrival_R2,naive_arrival_p,significant,cal_peakwk_slope,cal_peakwk_p,mig_peakwk_slope,mig_peakwk_p
+Northern Pintail,Anas acuta,-0.524,0.424,0.0063,True,-2.1618,0.0574,0.4,0.2175
+Northern Shoveler,Spatula clypeata,-0.366,0.417,0.0069,True,-0.5721,0.474,-0.3107,0.325
+Garganey,Spatula querquedula,-0.974,0.334,0.0191,True,-1.2191,0.1918,-0.1107,0.7621
+Eurasian Wigeon,Mareca penelope,-0.715,0.601,0.0004,True,-0.7618,0.4712,0.0214,0.9578
+Common Pochard,Aythya ferina,-1.194,0.431,0.0058,True,-2.0103,0.1099,-0.2107,0.6589
+Bar-headed Goose,Anser indicus,-1.644,0.57,0.0007,True,-0.0809,0.949,-0.1321,0.7144
+Greylag Goose,Anser anser,-0.887,0.465,0.0036,True,0.8809,0.5143,-0.0393,0.8753
+Common Crane,Grus grus,-0.412,0.39,0.0097,True,-1.8235,0.126,0.0321,0.9368
+Demoiselle Crane,Grus virgo,-0.868,0.575,0.0007,True,-1.6853,0.0996,0.5464,0.148
+Greater Flamingo,Phoenicopterus roseus,-0.544,0.371,0.0122,True,-1.6838,0.0704,0.0071,0.9946
+Great White Pelican,Pelecanus onocrotalus,-0.404,0.556,0.0009,True,-1.3412,0.2695,0.1714,0.4894
+Dalmatian Pelican,Pelecanus crispus,-0.674,0.555,0.0009,True,-0.4206,0.708,0.1643,0.7288
