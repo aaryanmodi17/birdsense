@@ -91,6 +91,7 @@ CREATE TABLE environmental_annual (
     year INTEGER PRIMARY KEY,
     mean_winter_temperature REAL,
     total_winter_rainfall REAL,
+    total_monsoon_rainfall REAL,
     mean_winter_ndvi REAL
 );
 ```

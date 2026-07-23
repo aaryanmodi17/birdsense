@@ -177,6 +177,31 @@ def get_winter_ndvi(year, mock=False, project=None):
     return scale_ndvi(raw)  # MODIS scale x0.0001
 
 
+def _monsoon_window(year):
+    """SW monsoon Jun 1 - Sep 30 of `year` (end exclusive -> Oct 1). This is the
+    rain that fills Gujarat's wetlands BEFORE the Nov-Feb wintering season that
+    starts that November — mechanistically the relevant water input for
+    waterbirds, unlike the near-dry winter rainfall (implements
+    03_ENVIRONMENTAL_FRAMEWORK.md Variable 2b, exploratory)."""
+    return f"{year}-06-01", f"{year}-10-01"
+
+
+def get_monsoon_rainfall(year, mock=False, project=None):
+    """Total SW-monsoon (Jun-Sep) rainfall (mm) over Gujarat for `year` — ERA5/
+    HOURLY total_precipitation summed. Precedes and plausibly drives the wetland
+    extent birds encounter that winter (implements
+    03_ENVIRONMENTAL_FRAMEWORK.md Variable 2b, exploratory)."""
+    if mock:
+        return round(_rng("monsoon", year).uniform(300.0, 1200.0), 1)  # FAKE
+    ee = _ensure_ee(project)
+    start, end = _monsoon_window(year)
+    rain_m = (ee.ImageCollection(ERA5_COLLECTION).filterDate(start, end)
+              .select(ERA5_PRECIP_BAND).sum()
+              .reduceRegion(ee.Reducer.mean(), _region(ee), ERA5_SCALE_M)
+              .get(ERA5_PRECIP_BAND).getInfo())
+    return meters_to_mm(rain_m)  # METERS -> mm
+
+
 def _era5_day(col_day, point, ee):
     """Aggregate one day's ERA5/HOURLY images at a point: daily MEAN temperature
     (deg C) and daily SUMMED precipitation (mm). Returns (temp_c, rain_mm) or
@@ -318,7 +343,8 @@ def build_annual_environmental(years=STUDY_YEARS, mock=False, project=None):
         rows.append({
             "year": year,
             "mean_winter_temperature": tr["mean_winter_temperature_c"],  # deg C
-            "total_winter_rainfall": tr["total_winter_rainfall_mm"],     # mm
+            "total_winter_rainfall": tr["total_winter_rainfall_mm"],     # mm (Nov-Feb)
+            "total_monsoon_rainfall": get_monsoon_rainfall(year, mock=mock, project=project),  # mm (Jun-Sep)
             "mean_winter_ndvi": get_winter_ndvi(year, mock=mock, project=project),
         })
     df = pd.DataFrame(rows)

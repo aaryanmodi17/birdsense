@@ -46,7 +46,7 @@ def test_mock_annual_table_tagged_fake():
     annual = ENV.build_annual_environmental(years=[2010, 2011], mock=True)
     assert list(annual.columns) == [
         "year", "mean_winter_temperature", "total_winter_rainfall",
-        "mean_winter_ndvi", "env_source",
+        "total_monsoon_rainfall", "mean_winter_ndvi", "env_source",
     ]
     assert (annual["env_source"] == ENV.MOCK_TAG).all()  # labelled fake
 

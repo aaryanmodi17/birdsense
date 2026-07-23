@@ -52,6 +52,27 @@ temperature, aggregated hourly → daily (daily **sum**) → winter-season total
 
 ---
 
+## Variable 2b: Monsoon Rainfall (exploratory)
+
+**Why:** Gujarat's winter (Nov–Feb) is near-dry, so winter-season rainfall
+totals are small and weakly informative about how much water is actually
+standing in the wetlands when the birds arrive. The southwest monsoon that
+*precedes* the wintering season is the rain that fills those wetlands, so it
+is the mechanistically relevant water input for waterbirds. Kept, like
+Variable 2, for **exploratory correlation and future-work discussion only** —
+it is not part of H1–H3 and no hypothesis is evaluated against it.
+
+**Dataset:** Same `ECMWF/ERA5/HOURLY` collection and `total_precipitation`
+band as Variable 2, summed over the monsoon window.
+
+**Variable used:** Total southwest-monsoon rainfall (Jun 1 – Sep 30) of year
+`Y`, paired with the wintering season that begins in November of that same
+year `Y`.
+
+**Spatial/temporal resolution:** Same as temperature.
+
+---
+
 ## Variable 3: NDVI (Vegetation / Habitat Proxy)
 
 **Why:** Proxy for vegetation productivity and, at a rough level,
