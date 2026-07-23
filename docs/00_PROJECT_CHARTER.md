@@ -29,8 +29,8 @@ whether those changes actually show up in the region's long-term bird
 migration data. The project is:
 
 - Built with AI-assisted coding (Claude), under the researcher's own
-  research direction and with mentor support from TOPS Technologies
-  data-science/analytics mentors.
+  research direction and with mentor support from data-science and
+  analytics mentors.
 - Owned scientifically by the researcher: research question, hypotheses,
   species selection, and interpretation of results are the researcher's
   own decisions, informed by their personal field expertise as an active

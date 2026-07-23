@@ -17,7 +17,7 @@ ready whenever asked about the project.
 > Anthropic) for writing and debugging the Python data pipeline and
 > statistical analysis code, guided throughout by the researcher's own
 > research design decisions. Technical mentorship was provided by
-> data-science/analytics mentors at TOPS Technologies. The research
+> data-science and analytics mentors. The research
 > question, hypotheses, species and variable selection, and
 > interpretation of results — including the decision to treat Dalmatian
 > Pelican as a qualitative case study due to insufficient data for

@@ -1,8 +1,8 @@
 # More watchers, not earlier birds: growth in observer effort generates spurious migration‑phenology trends in citizen‑science data for Gujarat's wintering waterbirds (2010–2025)
 
 **Author:** [Your Name]¹  
-**Mentorship:** data‑science/analytics mentors, TOPS Technologies²  
-¹ Independent researcher, Gujarat, India · ² Ahmedabad, India  
+**Mentorship:** data‑science and analytics mentors  
+¹ Independent researcher, Gujarat, India  
 *Corresponding author:* [your email]
 
 *Implementation note:* the analysis pipeline was implemented with AI‑assisted coding (Claude, Anthropic) under the author's direction; all research questions, species and variable selection, and interpretation are the author's own (see Acknowledgements/Disclosure).
@@ -86,7 +86,7 @@ Rapidly growing citizen‑science archives are transformative, but their growth 
 Raw data are freely available from eBird (ebird.org; Gujarat EBD, release relMay‑2026) under eBird's terms of use. All analysis code, tests, and figure‑generation scripts are archived at [GitHub/Zenodo DOI — insert]. Environmental covariates are public via Google Earth Engine.
 
 ## Acknowledgements and Disclosure
-The author designed the study, selected species and variables, and interpreted all results, drawing on field experience as an active Gujarat eBirder. Technical mentorship was provided by data‑science/analytics mentors at TOPS Technologies. The analysis pipeline was implemented with AI‑assisted coding (Claude, Anthropic); the AI served as an implementation and debugging tool, not as a source of scientific judgement. We thank the eBird programme and its thousands of Gujarat contributors, whose effort — the very subject of this paper — makes such analysis possible.
+The author designed the study, selected species and variables, and interpreted all results, drawing on field experience as an active Gujarat eBirder. Technical mentorship was provided by data‑science and analytics mentors. The analysis pipeline was implemented with AI‑assisted coding (Claude, Anthropic); the AI served as an implementation and debugging tool, not as a source of scientific judgement. We thank the eBird programme and its thousands of Gujarat contributors, whose effort — the very subject of this paper — makes such analysis possible.
 
 ## References
 *(Verify each DOI before submission; landmark data/method papers are cited by their standard references.)*
