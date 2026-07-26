@@ -523,6 +523,4 @@ The eBird programme and its thousands of Gujarat contributors, whose collective 
 
 ## License
 
-No license file is present. All rights reserved by default until one is added;
-contact the author before reuse. The underlying eBird, ERA5 and MODIS datasets carry
-their own terms.
+This project is licensed under the MIT License — see LICENSE for the full text. In short: anyone may use, copy, modify, and distribute this code (including commercially), provided the original copyright notice is retained; the software is provided "as is," without warranty. The underlying eBird, ERA5 and MODIS datasets carry their own separate terms of use and are not covered by this license.
